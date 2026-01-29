@@ -38,7 +38,7 @@ function App() {
   const recognitionRef = useRef(null);
   
   const { RiveComponent, rive } = useRive({
-    src: '/BIGEYES.riv',
+    src: `${import.meta.env.BASE_URL}BIGEYES.riv`,
     stateMachines: 'State Machine 1',
     autoplay: true,
   });
