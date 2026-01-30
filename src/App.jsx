@@ -35,6 +35,7 @@ function App() {
   const [transcript, setTranscript] = useState('');
   const [aiReply, setAiReply] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(true);
   const recognitionRef = useRef(null);
   
   const { RiveComponent, rive } = useRive({
@@ -67,7 +68,19 @@ function App() {
       recognitionRef.current.onerror = (event) => {
         console.error('Speech recognition error:', event.error);
         setIsListening(false);
+        
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          alert('麦克风权限被拒绝，请在浏览器设置中允许麦克风访问');
+          setSpeechSupported(false);
+        } else if (event.error === 'no-speech') {
+          alert('没有检测到语音，请重试');
+        } else if (event.error === 'network') {
+          alert('网络错误，语音识别需要网络连接');
+        }
       };
+    } else {
+      setSpeechSupported(false);
+      console.warn('浏览器不支持语音识别');
     }
   }, []);
 
@@ -149,7 +162,16 @@ function App() {
   // 开始/停止语音识别
   const toggleListening = () => {
     if (!recognitionRef.current) {
-      alert('您的浏览器不支持语音识别，请使用 Chrome 浏览器');
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+      
+      if (isIOS) {
+        alert('抱歉，iOS Safari 不支持语音识别\n\n建议：\n1. 使用 Android Chrome 浏览器\n2. 或访问 GitHub Pages 部署版本（HTTPS）');
+      } else if (isMobile) {
+        alert('移动端语音识别需要 HTTPS 环境\n\n请访问 GitHub Pages 部署版本');
+      } else {
+        alert('您的浏览器不支持语音识别，请使用 Chrome 浏览器');
+      }
       return;
     }
 
@@ -183,8 +205,13 @@ function App() {
         }
       };
       
-      recognitionRef.current.start();
-      setIsListening(true);
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+      } catch (error) {
+        console.error('启动语音识别失败:', error);
+        alert('启动语音识别失败，请刷新页面重试');
+      }
     }
   };
 
@@ -277,6 +304,27 @@ function App() {
         )}
       </button>
       
+      {/* 语音识别提示 */}
+      {!speechSupported && (
+        <div style={{
+          position: 'fixed',
+          bottom: 100,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          padding: '8px 16px',
+          backgroundColor: 'rgba(0,0,0,0.7)',
+          color: '#fff',
+          borderRadius: '20px',
+          fontSize: '12px',
+          zIndex: 999,
+          whiteSpace: 'nowrap',
+        }}>
+          {/iPhone|iPad|iPod/i.test(navigator.userAgent) 
+            ? 'iOS 不支持语音识别' 
+            : '需要 HTTPS 环境'}
+        </div>
+      )}
+      
       {/* CSS 动画 */}
       <style>{`
         @keyframes spin {
@@ -330,63 +378,103 @@ function App() {
       {panelOpen && (
         <div style={{
           position: 'fixed',
-          top: 20,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          display: 'flex',
-          gap: '6px',
-          padding: '6px 10px',
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          borderRadius: '8px',
+          top: 10,
+          left: 10,
+          right: 10,
+          padding: '8px',
+          backgroundColor: 'rgba(0,0,0,0.6)',
+          borderRadius: '12px',
           zIndex: 1000,
+          maxWidth: '400px',
+          margin: '0 auto',
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '8px',
         }}>
-          {MOOD_STATES.map((state) => (
-            <button
-              key={state.value}
-              onClick={() => handleMoodChange(state.value)}
-              style={{
-                padding: '5px 10px',
-                backgroundColor: currentMood === state.value ? state.color : 'rgba(255,255,255,0.15)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                fontSize: '11px',
-              }}
-            >
-              {state.label}
-            </button>
-          ))}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(70px, 1fr))',
+            gap: '6px',
+            flex: 1,
+          }}>
+            {MOOD_STATES.map((state) => (
+              <button
+                key={state.value}
+                onClick={() => handleMoodChange(state.value)}
+                style={{
+                  padding: '8px 4px',
+                  backgroundColor: currentMood === state.value ? state.color : 'rgba(255,255,255,0.2)',
+                  color: '#fff',
+                  border: currentMood === state.value ? '2px solid rgba(255,255,255,0.5)' : 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '11px',
+                  fontWeight: currentMood === state.value ? '600' : '400',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                {state.label}
+              </button>
+            ))}
+          </div>
+          
+          {/* 关闭按钮 */}
+          <button
+            onClick={() => setPanelOpen(false)}
+            style={{
+              width: '32px',
+              height: '32px',
+              minWidth: '32px',
+              padding: 0,
+              backgroundColor: 'rgba(255,255,255,0.2)',
+              border: 'none',
+              borderRadius: '50%',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff',
+              fontSize: '20px',
+              lineHeight: 1,
+              flexShrink: 0,
+            }}
+          >
+            ×
+          </button>
         </div>
       )}
       
-      {/* Debug 开关 */}
-      <button
-        onClick={() => setPanelOpen(!panelOpen)}
-        style={{
-          position: 'fixed',
-          top: 20,
-          right: 20,
-          width: '32px',
-          height: '32px',
-          minWidth: '32px',
-          maxWidth: '32px',
-          padding: 0,
-          backgroundColor: 'rgba(0,0,0,0.3)',
-          border: 'none',
-          borderRadius: '50%',
-          cursor: 'pointer',
-          zIndex: 1000,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#fff',
-          fontSize: panelOpen ? '18px' : '10px',
-          lineHeight: 1,
-        }}
-      >
-        {panelOpen ? '×' : '⚙'}
-      </button>
+      {/* Debug 开关（面板关闭时显示） */}
+      {!panelOpen && (
+        <button
+          onClick={() => setPanelOpen(true)}
+          style={{
+            position: 'fixed',
+            top: 10,
+            right: 10,
+            width: '40px',
+            height: '40px',
+            minWidth: '40px',
+            maxWidth: '40px',
+            padding: 0,
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            border: 'none',
+            borderRadius: '50%',
+            cursor: 'pointer',
+            zIndex: 1001,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#fff',
+            fontSize: '16px',
+            lineHeight: 1,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+          }}
+        >
+          ⚙
+        </button>
+      )}
     </>
   );
 }
